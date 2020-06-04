@@ -1,0 +1,107 @@
+﻿#pragma kernel Init
+#pragma kernel Emit
+#pragma kernel Update
+#define THREADS [numthreads(8, 1, 1)]
+#include "../utilsShader.cginc"
+
+struct Particle
+{
+	bool active;
+	float3 position;
+	float3 velocity;
+	float3 rotation;
+	float3 angVelocity;
+	float4 color;
+	float scale;
+	float time;
+	float lifeTime;
+};
+
+RWStructuredBuffer<Particle>  _particles;
+AppendStructuredBuffer<uint>  _deadList;
+ConsumeStructuredBuffer<uint> _particlePool;
+
+float _deltaTime;
+float _screenWidth;
+float _screenHeight;
+float4 _position;
+float4 _range;
+float4 _velocity;
+float4 _angVelocity;
+float _scale;
+float _lifeTime;
+
+
+float4x4 _ViewProj;
+Texture2D<float> _CameraDepthTexture;
+Texture2D<float4> _CameraGBufferTexture2;//normal
+
+
+
+THREADS
+void Init(uint id : SV_DispatchThreadID) {
+	_particles[id].active = false;
+	_deadList.Append(id);
+	
+	
+	int i = floor(id / 8);
+	//_particles[id].position = float3(0.0, 0.0, 0.0);
+	//_particles[id].position = rand3(float2(i, i))*10.0;
+	//_particles[id].velocity = float3(0.0, rand(float2(i, i)), 0.0);
+	
+}
+
+
+THREADS
+void Emit() {
+	//this thread is computed on each particle
+	uint id = _particlePool.Consume();
+	float2 seed = float2(id + 1, id + 2);
+	float3 randomRange = rand3(seed);
+	float3 randomVelocity = rand3(seed + 1);
+	float3 randomRotation = rand3(seed + 2);
+	float randomLifeRange = rand(float2(id, id));
+
+	Particle p = _particles[id];
+	p.active = true;
+	
+	//emit from (0.0, 0.0, 0.0) + random_offset
+	p.position = randomRange * _range.xyz;
+	
+	p.velocity = randomVelocity;
+	p.rotation = randomRotation * _angVelocity.xyz;
+	p.angVelocity = p.rotation;
+	p.color = 0;
+	p.scale = _scale;
+	p.time = 0.0;
+	p.lifeTime = _lifeTime * randomLifeRange;
+	_particles[id] = p;
+}
+
+THREADS
+void Update(uint id : SV_DispatchThreadID) {
+	Particle p = _particles[id];
+
+	if (p.active) {
+		p.time += _deltaTime;
+
+		//p.velocity.y += 9.8 * _deltaTime;
+		//p.velocity += 15.0 * rand3(float2(id, id)) * _deltaTime;
+		p.position += p.velocity * _deltaTime * 10.0;
+		//p.position += rand3(float2(id, id));
+		//p.color = float4(0.6, length(p.velocity) / 5, pow(p.time / p.lifeTime, 2), 1);
+
+		float pn = 5.0;
+		p.color = float4(pow(p.time / p.lifeTime, pn), pow(p.time / p.lifeTime, pn), pow(p.time / p.lifeTime, pn), 1);
+		//p.color = float4(pow(p.time / p.lifeTime, pn), 0.0, 0.0, 1);
+
+		if (p.time > p.lifeTime) {
+			p.active = false;
+			_deadList.Append(id);
+		}
+	}
+	else {
+		p.scale = 0.0;
+	}
+	_particles[id] = p;
+}
