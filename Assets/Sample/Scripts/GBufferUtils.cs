@@ -11,6 +11,7 @@ public class GBufferUtils : MonoBehaviour
     Material gbufferCopyMaterial_;
 
     Mesh quad_;
+    [SerializeField]
     RenderTexture depthTexture_;
     RenderTexture[] gbufferTextures_ = new RenderTexture[4];
 
@@ -21,7 +22,7 @@ public class GBufferUtils : MonoBehaviour
 
     static public GBufferUtils GetInstance()
     {
-        Assert.IsTrue(Instance != null, "At least one GBufferUtils must be attached to a camera and be set as active.");
+        //Assert.IsTrue(Instance != null, "At least one GBufferUtils must be attached to a camera and be set as active.");
         return Instance;
     }
 
@@ -97,6 +98,7 @@ public class GBufferUtils : MonoBehaviour
     IEnumerator OnPostRender()
     {
         yield return new WaitForEndOfFrame();
+        Debug.Log("RenderDepthTex");
         UpdateRenderTextures();
         UpdateGBuffer();
     }
@@ -122,6 +124,8 @@ public class GBufferUtils : MonoBehaviour
         }
     }
 
+
+    //自身のメンバに代入を行う
     void UpdateGBuffer()
     {
         var gbuffers = new RenderBuffer[4];

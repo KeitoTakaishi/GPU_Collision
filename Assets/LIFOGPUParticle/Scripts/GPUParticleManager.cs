@@ -198,8 +198,9 @@ namespace GPUParticles
             {
                 DispatchEmit();
             }
+            DispatchEmit();
             DispatchUpdate();
-            ResisterDraw(Camera.main);
+            RegisterDraw(Camera.main);
         }
 
         
@@ -234,7 +235,7 @@ namespace GPUParticles
             computeShader.Dispatch(updateKernel, maxParticleNum / 8, 1, 1);
         }
 
-        void ResisterDraw(Camera camera)
+        void RegisterDraw(Camera camera)
         {
             material.SetBuffer("_Particles", particleBuffer);
             for(int i = 0; i < meshNum; ++i)

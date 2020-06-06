@@ -113,7 +113,8 @@ void Update(uint id : SV_DispatchThreadID)
         }
 
         p.position += p.velocity * _DeltaTime;
-        p.color = float4(0, length(p.velocity) / 5, pow(p.time / p.lifeTime, 2), 1);
+		//p.color = float4(0, length(p.velocity) / 5, pow(p.time / p.lifeTime, 2), 1);
+		p.color = float4(uv.x - 0.5 , 0.0, 0.0, 1.0);
 
         if (p.time > p.lifeTime) {
             p.active = false;

@@ -51,7 +51,8 @@ gbuffer_out frag(v2f v)
     o.specular = tex2D(_CameraGBufferTexture1, uv);
     o.normal   = tex2D(_CameraGBufferTexture2, uv);
     o.emission = tex2D(_CameraGBufferTexture3, uv);
-    o.depth    = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv);
+	o.depth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv);
+	//o.depth = 100.0;
     return o;
 }
 

@@ -1,6 +1,5 @@
-﻿Shader "GPUParticle/PseudoInstancedGPUParticle"
+﻿Shader "GPUParticle/GPURender"
 {
-
 	SubShader
 	{
 
@@ -103,20 +102,22 @@
 	gbuffer_out frag(v2f i) : SV_Target
 	{
 		gbuffer_out o;
-	o.diffuse = 0;
-	o.normal = float4(0.5 * i.normal + 0.5, 1);
-	o.emission = o.diffuse * 0.1;
-	//o.emission = float4(0.0, 0.0, 1.0, 1.0)
-	o.specular = 0;
+		o.diffuse = 0;
+		o.normal = float4(0.5 * i.normal + 0.5, 1);
+		//o.emission = o.diffuse * 0.7;
+		o.emission = float4(0.2, 0.2, 0.2, 1.0);
+		o.specular = 0;
 
-	//particle自体の深度情報を書き込むかどうか
-	//o.depth = i.position;
-	o.depth = 100.0;
+		//particle自体の深度情報を書き込むかどうか
+		//1.0 ~ 0.0の範囲になっているので注意が必要
+		o.depth = i.position;
+		//o.depth = 1.0;
 
 #ifdef SHADER_API_D3D11
 	Particle p;
 	p = _Particles[getId(i.uv1)];
 	o.diffuse = p.color;
+	o.emission = p.color * 0.45;
 #endif
 
 	return o;
@@ -155,7 +156,7 @@
 			ENDCG
 	}
 
-	/*
+	
 	Pass
 	{
 	Tags { "LightMode" = "ShadowCaster" }
@@ -173,7 +174,7 @@
 	#pragma fragmentoption ARB_precision_hint_fastest
 	ENDCG
 	}
-	*/
+	
 
 	}
 

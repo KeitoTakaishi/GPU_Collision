@@ -44,7 +44,7 @@ void Init(uint id : SV_DispatchThreadID) {
 	_deadList.Append(id);
 	
 	
-	int i = floor(id / 8);
+	//int i = floor(id / 8);
 	//_particles[id].position = float3(0.0, 0.0, 0.0);
 	//_particles[id].position = rand3(float2(i, i))*10.0;
 	//_particles[id].velocity = float3(0.0, rand(float2(i, i)), 0.0);

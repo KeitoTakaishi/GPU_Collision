@@ -1,0 +1,159 @@
+﻿#pragma kernel Init
+#pragma kernel Emit
+#pragma kernel Update
+#define THREADS [numthreads(8, 1, 1)]
+#include "utilsShader.cginc"
+#include "UnityCG.cginc"
+
+struct Particle
+{
+	bool active;
+	float3 position;
+	float3 velocity;
+	float3 rotation;
+	float3 angVelocity;
+	float4 color;
+	float scale;
+	float time;
+	float lifeTime;
+};
+
+RWStructuredBuffer<Particle>  _particles;
+AppendStructuredBuffer<uint>  _deadList;
+ConsumeStructuredBuffer<uint> _particlePool;
+
+float _deltaTime;
+float _screenWidth;
+float _screenHeight;
+float4 _position;
+float4 _range;
+float4 _velocity;
+float4 _angVelocity;
+float _scale;
+float _lifeTime;
+
+
+float4x4 _ViewProj;
+float4x4 _view;
+float4x4 _proj;
+Texture2D<float> _CameraDepthTex;
+Texture2D<float4> _CameraGBufferTex2;//normal
+
+
+float GetDepth(float2 uv) {
+	float2 coord = float2(uv.x * _screenWidth, uv.y * _screenHeight);
+	return _CameraDepthTex[coord].r;
+}
+
+inline float3 GetNormal(float2 uv)
+{
+	float2 coord = float2(uv.x * _screenWidth, uv.y * _screenHeight);
+	return _CameraGBufferTex2[coord].rgb * 2.0 - 1.0;
+}
+
+
+THREADS
+void Init(uint id : SV_DispatchThreadID) {
+	_particles[id].active = false;
+	_deadList.Append(id);
+}
+
+
+THREADS
+void Emit() {
+	//this thread is computed on each particle
+	uint id = _particlePool.Consume();
+	float2 seed = float2(id + 1, id + 2);
+	float3 randomRange = rand3(seed);
+	float3 randomVelocity = rand3(seed + 1);
+	float3 randomRotation = rand3(seed + 2);
+	float randomLifeRange = rand(float2(id, id));
+
+	Particle p = _particles[id];
+	p.active = true;
+
+	//emit from (0.0, 0.0, 0.0) + random_offset
+	//p.position = randomRange * _range.xyz;
+	p.position = _position;
+	p.velocity = randomVelocity * _velocity.xyz;
+	//p.velocity = float3(0.0, 0.0, p.velocity.z);
+	p.rotation = randomRotation * _angVelocity.xyz;
+	p.angVelocity = p.rotation;
+	p.color = 0;
+	p.scale = _scale;
+	p.time = 0.0;
+	p.lifeTime = _lifeTime * randomLifeRange;
+	_particles[id] = p;
+}
+
+
+
+/*
+Depthの値はfar, nearの値によって変わる
+*/
+
+float _timeSpeed;
+THREADS
+void Update(uint id : SV_DispatchThreadID) {
+	Particle p = _particles[id];
+
+	if (p.active) {
+		
+		p.velocity.y += -9.8 * _deltaTime;
+		p.scale = (pow(p.time / p.lifeTime, 3.0) - 1.0) * 1.0;
+		p.time += _deltaTime * _timeSpeed;
+		//p.scale = 0.2*(p.lifeTime - p.time);
+		p.rotation += p.angVelocity * _deltaTime;
+
+		float3 nextPos = p.position + p.velocity * _deltaTime;
+		float4 vpPos = mul(_ViewProj, float4(nextPos, 1.0));
+		float2 uv = vpPos.xy / vpPos.w * 0.5 + 0.5;
+		float gbufferDepth = GetDepth(uv);
+		gbufferDepth = Linear01Depth(gbufferDepth);
+		float particleDepth = vpPos.z / vpPos.w;
+		particleDepth = Linear01Depth(particleDepth);
+		float3 normal = GetNormal(uv);
+
+		
+		/*
+		if (particleDepth > gbufferDepth) {
+		//if (particleDepth < gbufferDepth) {
+			//p.velocity.y += 9.8 * _deltaTime;
+			//p.velocity -= p.velocity * 1.2;
+			//p.velocity.xyz += float3(0.0, 13.8, 0.0) * _DeltaTime;
+			//p.velocity -= dot(p.velocity, normal) * normal * 1.01;
+			p.color = float4(1.0, 0.0, 0.0, 1.0);
+			p.position = nextPos;
+		}
+		*/
+
+		if(particleDepth <= gbufferDepth+0.01){
+			//既存の値よりも小さいときに反射
+			//p.velocity.y += p.velocity.y * 0.3;
+			//p.color = float4(1.0, 0.0, 1.0, 1.0);
+			//p.position = float3(0.0, 10.0, 0.0);
+			//p.position -= p.velocity * _deltaTime;
+			p.velocity -= dot(p.velocity, normal) * normal * 1.75;
+		}
+
+		//p.position = nextPos+p.velocity * _deltaTime;
+		//p.color = float4(0, length(p.velocity) / 5, pow(p.time / p.lifeTime, 2), 1);
+		//p.color = float4(uv.x - 0.5, 0.0, 0.0, 1.0);
+		
+
+		float diffDepth = (particleDepth - gbufferDepth);
+		p.position += p.velocity * _deltaTime;
+		p.color = float4(uv.x - 0.5, uv.y - 0.5, particleDepth, 1.0);
+
+		if (p.time > p.lifeTime) {
+			p.active = false;
+			//死亡Particleリストに追加していく
+			_deadList.Append(id);
+		}
+	}
+	else {
+		p.scale = 0;
+	}
+
+	_particles[id] = p;
+}
